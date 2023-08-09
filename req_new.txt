@@ -1,0 +1,16 @@
+accelerate
+appdirs
+# int8
+bitsandbytes==0.37.1
+bitsandbytes
+black
+black[jupyter]
+gradio
+datasets==2.10.1
+fire
+transformers==4.29.2
+loralib
+sentencepiece
+psutil
+pyyaml
+safetensors
