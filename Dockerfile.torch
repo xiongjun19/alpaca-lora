@@ -16,7 +16,7 @@ RUN pip install pydantic --upgrade
 RUN pip install gpustats
 RUN pip install openpyxl
 RUN pip install deepspeed==0.9.2
-RUN pip install accelerate==0.19.0
+RUN pip install accelerate
 RUN pip install mpi4py==3.1.4
 RUN pip install flask 
 ADD  req_new.txt .

@@ -1,7 +1,6 @@
 accelerate
 appdirs
 # int8
-bitsandbytes==0.37.1
 bitsandbytes
 black
 black[jupyter]
