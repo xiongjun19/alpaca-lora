@@ -109,12 +109,13 @@ def train(
     if len(wandb_log_model) > 0:
         os.environ["WANDB_LOG_MODEL"] = wandb_log_model
 
+
     model = LlamaForCausalLM.from_pretrained(
         base_model,
-        #load_in_8bit=True,
+        # load_in_8bit=True,
         torch_dtype=torch.float16,
         device_map=device_map,
-    ).half()
+    )
 
     tokenizer = LlamaTokenizer.from_pretrained(base_model)
 
@@ -253,6 +254,7 @@ def train(
             group_by_length=group_by_length,
             report_to="wandb" if use_wandb else None,
             run_name=wandb_run_name if use_wandb else None,
+            dataloader_num_workers=4,
         ),
         data_collator=transformers.DataCollatorForSeq2Seq(
             tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
@@ -270,6 +272,7 @@ def train(
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
 
+    # import ipdb; ipdb.set_trace()
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     model.save_pretrained(output_dir)
