@@ -113,6 +113,7 @@ def train(
     model = LlamaForCausalLM.from_pretrained(
         base_model,
         # load_in_8bit=True,
+        trust_remote_code=True,
         torch_dtype=torch.float16,
         device_map=device_map,
     )
@@ -173,6 +174,13 @@ def train(
         return tokenized_full_prompt
 
     # model = prepare_model_for_int8_training(model)
+    model.enable_input_require_grads()
+    model.is_parallelizable = True
+    model.model_parallel = True
+    # model.lm_head = CastOutputToFloat(model.lm_head)
+    model.config.use_cache = (
+        False  # silence the warnings. Please re-enable for inference!
+    ) 
 
     config = LoraConfig(
         r=lora_r,
@@ -272,7 +280,6 @@ def train(
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
 
-    # import ipdb; ipdb.set_trace()
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
     model.save_pretrained(output_dir)
