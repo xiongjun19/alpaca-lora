@@ -264,7 +264,7 @@ def train(
             warmup_steps=100,
             num_train_epochs=num_epochs,
             learning_rate=learning_rate,
-            max_steps=5
+            max_steps=5,
             fp16=True,
             logging_steps=10,
             optim="adamw_torch",
