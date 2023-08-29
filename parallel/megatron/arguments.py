@@ -11,7 +11,7 @@ import types
 
 import torch.nn.functional as F
 from megatron.global_vars import set_retro_args, get_retro_args
-from tools.retro.utils import get_args_path as get_retro_args_path
+# from tools.retro.utils import get_args_path as get_retro_args_path
 
 from megatron.core.transformer import TransformerConfig
 
@@ -365,15 +365,15 @@ def validate_args(args, defaults={}):
             "retro currently does not support pipeline parallelism."
 
         # Load retro args.
-        retro_args_path = get_retro_args_path(args.retro_workdir)
-        assert os.path.exists(retro_args_path), "retro workdir missing args.json"
-        with open(retro_args_path) as f:
-            retro_args = types.SimpleNamespace(**json.load(f))
-            retro_args.retro_return_doc_ids = args.retro_return_doc_ids
-            retro_args.retro_gpt_retrieved_length = \
-                args.retro_num_retrieved_chunks * \
-                retro_args.retro_gpt_chunk_length
-            set_retro_args(retro_args)
+        # retro_args_path = get_retro_args_path(args.retro_workdir)
+        # assert os.path.exists(retro_args_path), "retro workdir missing args.json"
+        # with open(retro_args_path) as f:
+        #     retro_args = types.SimpleNamespace(**json.load(f))
+        #     retro_args.retro_return_doc_ids = args.retro_return_doc_ids
+        #     retro_args.retro_gpt_retrieved_length = \
+        #         args.retro_num_retrieved_chunks * \
+        #         retro_args.retro_gpt_chunk_length
+        #     set_retro_args(retro_args)
 
     # Legacy RoPE arguments
     if args.use_rotary_position_embeddings:
@@ -614,9 +614,7 @@ def _add_network_size_args(parser):
                        help='Untie embeddings and output weights.'),
     group.add_argument('--embedding-weights-in-fp32', action='store_true',
                        help='Cast word embedding weights to fp32 before embedding fwd.'),
-    group.add_argument('--embedding-weights-in-fp32', action='store_true',
-                       help='Cast word embedding weights to fp32 before embedding fwd.'),
-    group.add_argument('--model-cfg-path', type='str',
+    group.add_argument('--model-cfg-path', type=str,
                        help='Cast word embedding weights to fp32 before embedding fwd.'),
 
     return parser

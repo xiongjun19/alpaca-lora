@@ -82,7 +82,7 @@ def loss_func(loss_mask, output_tensor):
 
 
 def forward_step(data_iterator, model):
-     """Forward step."""
+    """Forward step."""
     timers = get_timers()
     # Get the batch.
     timers('batch-generator', log_level=2).start()

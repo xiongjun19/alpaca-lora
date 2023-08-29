@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 import torch
 from torch import nn
 from megatron import get_args
@@ -376,10 +377,10 @@ class ParaLlamaAttention(MegatronModule):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
+        past_key_value  = None,
         output_attentions: bool = False,
         use_cache: bool = False,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+    ) :
         bsz, q_len, _ = hidden_states.size()
         query_states, _ = self.q_proj(hidden_states)
         key_states, _ = self.k_proj(hidden_states)
