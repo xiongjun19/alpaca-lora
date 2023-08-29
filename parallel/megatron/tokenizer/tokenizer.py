@@ -5,6 +5,7 @@
 from abc import ABC
 from abc import abstractmethod
 
+from transformers import LlamaTokenizer
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
 from .gpt2_tokenization import GPT2Tokenizer
 
@@ -39,6 +40,8 @@ def build_tokenizer(args):
     elif args.tokenizer_type == 'NullTokenizer':
         assert args.vocab_size is not None
         tokenizer = _NullTokenizer(args.vocab_size)
+    elif args.tokenizer_type == 'LlamaTokenizer':
+        tokenizer = LlamaTokenizer.from_pretrained(args.model_cfg_path)
     else:
         raise NotImplementedError('{} tokenizer is not '
                                   'implemented.'.format(args.tokenizer_type))

@@ -1,6 +1,7 @@
 """fine_tune Llama"""
 
 
+import os
 import json
 import torch
 from functools import partial
@@ -10,25 +11,22 @@ from megatron import get_timers
 from megatron import get_tokenizer
 from megatron.core import tensor_parallel
 from megatron.core.enums import ModelType
-from megatron.data.gpt_dataset import build_train_valid_test_datasets
-from megatron.model import GPTModel
 from megatron.training import pretrain
 from megatron.utils import get_ltor_masks_and_position_ids
 from megatron.utils import average_losses_across_data_parallel_group
 from megatron.arguments import core_transformer_config_from_args
 from llama_mega_model import LlamaModel
 
-from transformers import LlamaForCausalLM, LlamaTokenizer
 from utils.prompter import Prompter
 from datasets import load_dataset
-from utils.prompter import Prompter
 
 
 def model_provider(pre_process=True, post_process=True):
     """Build the model."""
     print_rank_0('building GPT model ...')
     args = get_args()
-    config = _get_model_conf(args.model_cfg_path)
+    f_model_path = os.path.join(args.model_cfg_path, 'config.json')
+    config = _get_model_conf(f_model_path)
     mega_config = core_transformer_config_from_args(get_args())
     model = LlamaModel(config, mega_config,  pre_process, post_process)
     return model
@@ -64,7 +62,7 @@ def get_batch(data_iterator):
     # Get the masks and postition ids.
     attention_mask, loss_mask, position_ids = get_ltor_masks_and_position_ids(
         tokens,
-        tokenizer.eod,
+        tokenizer.eos_token_id,
         args.reset_position_ids,
         args.reset_attention_mask,
         args.eod_mask_loss)
@@ -84,19 +82,15 @@ def loss_func(loss_mask, output_tensor):
 
 
 def forward_step(data_iterator, model):
-    """Forward step."""
-    args = get_args()
+     """Forward step."""
     timers = get_timers()
-
     # Get the batch.
     timers('batch-generator', log_level=2).start()
     tokens, labels, loss_mask, attention_mask, position_ids = get_batch(
         data_iterator)
     timers('batch-generator').stop()
-
     output_tensor = model(tokens, position_ids, attention_mask,
                           labels=labels)
-
     return output_tensor, partial(loss_func, loss_mask)
 
 
@@ -145,6 +139,8 @@ def generate_and_tokenize_prompt(data_point):
 
 
 def tokenize(prompt, add_eos_token=True):
+    tokenizer = get_tokenizer()
+    cutoff_len = 256
     result = tokenizer(
         prompt,
         truncation=True,
@@ -166,11 +162,9 @@ def tokenize(prompt, add_eos_token=True):
 
 
 if __name__ == "__main__":
-
     pretrain(train_valid_test_datasets_provider,
              model_provider,
              ModelType.encoder_or_decoder,
              forward_step,
-             args_defaults={'tokenizer_type': 'GPT2BPETokenizer'})
-
+             args_defaults={'tokenizer_type': 'LlamaTokenizer'})
 
