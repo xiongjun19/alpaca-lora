@@ -1216,16 +1216,16 @@ class NoopTransformerLayer(MegatronModule):
 
 def _get_num_layers(args, model_type, is_decoder=False):
     """Compute the number of transformer layers resident on the current rank."""
-    is_encoder_and_decoder_model = (model_type == modeltype.encoder_and_decoder)
-    if model_type == modeltype.retro_encoder:
+    is_encoder_and_decoder_model = (model_type == ModelType.encoder_and_decoder)
+    if model_type == ModelType.retro_encoder:
         num_layers = args.retro_encoder_layers
     elif mpu.get_pipeline_model_parallel_world_size() > 1:
         if is_encoder_and_decoder_model:
-            assert args.pipeline_model_parallel_split_rank is not none
+            assert args.pipeline_model_parallel_split_rank is not None
 
-            # when a standalone embedding stage is used, a rank is taken from
+            # When a standalone embedding stage is used, a rank is taken from
             # the encoder's ranks, to be used for the encoder's embedding
-            # layer. this way, the rank referenced by the 'split rank' remains
+            # layer. This way, the rank referenced by the 'split rank' remains
             # the same whether or not a standalone embedding stage is used.
             num_ranks_in_encoder = (
                 args.pipeline_model_parallel_split_rank - 1
@@ -1251,7 +1251,7 @@ def _get_num_layers(args, model_type, is_decoder=False):
             assert args.num_layers % args.transformer_pipeline_model_parallel_size == 0, \
                 'num_layers must be divisible by transformer_pipeline_model_parallel_size'
 
-            # when a standalone embedding stage is used, all transformer layers
+            # When a standalone embedding stage is used, all transformer layers
             # are divided among pipeline rank >= 1, while on pipeline rank 0,
             # ranks either contain the input embedding layer (virtual pp rank 0),
             # or no layers at all (virtual pp rank >= 1).
@@ -1273,29 +1273,29 @@ def _get_layer_type(model_type, default_layer_type, retro_layer_numbers,
                     layer_number):
     args = get_args()
     if args.retro_add_retriever and layer_number in retro_layer_numbers:
-        if model_type == modeltype.retro_decoder:
-            return layertype.retro_decoder_with_retriever \
+        if model_type == ModelType.retro_decoder:
+            return LayerType.retro_decoder_with_retriever \
                 if layer_number == retro_layer_numbers[0] \
-                   else layertype.retro_decoder
-        elif model_type == modeltype.retro_encoder:
-            return layertype.retro_encoder
+                   else LayerType.retro_decoder
+        elif model_type == ModelType.retro_encoder:
+            return LayerType.retro_encoder
         else:
-            raise exception("unsupported model type, '%s'." % model_type)
+            raise Exception("Unsupported model type, '%s'." % model_type)
     else:
         return default_layer_type
 
 
-class paralleltransformer(megatronmodule):
-    """transformer class."""
+class ParallelTransformer(MegatronModule):
+    """Transformer class."""
 
     def __init__(self, config,
-                 model_type, layer_type=layertype.encoder,
-                 self_attn_mask_type=attnmasktype.padding,
-                 post_layer_norm=true,
-                 pre_process=true,
-                 post_process=true,
+                 model_type, layer_type=LayerType.encoder,
+                 self_attn_mask_type=AttnMaskType.padding,
+                 post_layer_norm=True,
+                 pre_process=True,
+                 post_process=True,
                  drop_path_rate=0.0):
-        super(paralleltransformer, self).__init__()
+        super(ParallelTransformer, self).__init__()
         args = get_args()
 
         self.layer_type = layer_type
@@ -1305,12 +1305,12 @@ class paralleltransformer(megatronmodule):
         self.post_layer_norm = post_layer_norm
         self.pre_process = pre_process
         self.post_process = post_process
-        self.input_tensor = none
+        self.input_tensor = None
         self.drop_path_rate = drop_path_rate
         self.transformer_impl = args.transformer_impl
         self.retro_add_retriever = args.retro_add_retriever
 
-        # store activation checkpoiting flag.
+        # Store activation checkpoiting flag.
         self.recompute_granularity = config.recompute_granularity
         self.recompute_method = config.recompute_method
         self.recompute_num_layers = config.recompute_num_layers
@@ -1319,87 +1319,87 @@ class paralleltransformer(megatronmodule):
 
         self.sequence_parallel = config.sequence_parallel
 
-        # transformer engine init.
-        self.transformer_engine_v_0_10 = false
-        self.transformer_engine_v_0_11 = false
-        self.transformer_engine_v_0_8 = false
+        # Transformer Engine Init.
+        self.transformer_engine_v_0_10 = False
+        self.transformer_engine_v_0_11 = False
+        self.transformer_engine_v_0_8 = False
         if self.transformer_impl == 'transformer_engine':
             global transformer_engine
             import transformer_engine
             from importlib.metadata import version
             from pkg_resources import packaging
 
-            te_version = packaging.version.version(version("transformer-engine"))
-            if te_version >= packaging.version.version("0.8.0"):
-                self.transformer_engine_v_0_8 = true
-            if te_version >= packaging.version.version("0.10.0"):
-                self.transformer_engine_v_0_10 = true
-            if te_version >= packaging.version.version("0.11.0"):
-                self.transformer_engine_v_0_11 = true
+            te_version = packaging.version.Version(version("transformer-engine"))
+            if te_version >= packaging.version.Version("0.8.0"):
+                self.transformer_engine_v_0_8 = True
+            if te_version >= packaging.version.Version("0.10.0"):
+                self.transformer_engine_v_0_10 = True
+            if te_version >= packaging.version.Version("0.11.0"):
+                self.transformer_engine_v_0_11 = True
 
             del version, packaging
 
-            assert not args.squared_relu, "transformerengine does not support squared relu activation."
+            assert not args.squared_relu, "TransformerEngine does not support squared relu activation."
 
         self.use_fp8 = args.fp8_e4m3 or args.fp8_hybrid
-        self.fp8_recipe = none
-        self.fp8_group = none
+        self.fp8_recipe = None
+        self.fp8_group = None
         if self.use_fp8:
             assert args.transformer_impl == 'transformer_engine', \
                 'transformer-engine required for fp8 training and inference'
             self.fp8_group = mpu.get_amax_reduction_group()
             if args.fp8_e4m3:
-                fp8_format = transformer_engine.common.recipe.format.e4m3
+                fp8_format = transformer_engine.common.recipe.Format.E4M3
             elif args.fp8_hybrid:
-                fp8_format = transformer_engine.common.recipe.format.hybrid
-            self.fp8_recipe = transformer_engine.common.recipe.delayedscaling(
+                fp8_format = transformer_engine.common.recipe.Format.HYBRID
+            self.fp8_recipe = transformer_engine.common.recipe.DelayedScaling(
                 margin=args.fp8_margin,
                 interval=args.fp8_interval,
                 fp8_format=fp8_format,
                 amax_history_len=args.fp8_amax_history_len,
                 amax_compute_algo=args.fp8_amax_compute_algo,
-                override_linear_precision=(false, false, not args.fp8_wgrad),
+                override_linear_precision=(False, False, not args.fp8_wgrad),
             )
 
         self.num_microbatches_in_previous_step = -1
         self.microbatch_count = 0
         self.checkpoint_core_attention = config.recompute_granularity == 'selective'
 
-        # number of layers.
+        # Number of layers.
         self.num_layers = _get_num_layers(args, model_type,
-                                          layer_type==layertype.decoder)
+                                          layer_type==LayerType.decoder)
 
         self.drop_path_rates = [
             rate.item() for rate in
             torch.linspace(0, self.drop_path_rate, config.num_layers)]
 
-        self.retro_layer_numbers = none
-        if model_type == modeltype.retro_decoder:
+        self.retro_layer_numbers = None
+        if model_type == ModelType.retro_decoder:
             retro_layer_start = 6 if config.num_layers <= 15 else 9
             self.retro_layer_numbers = \
                 np.arange(retro_layer_start, args.num_layers + 1, 3).tolist()
-        if model_type == modeltype.retro_encoder:
+        if model_type == ModelType.retro_encoder:
             self.retro_layer_numbers = [1]
 
-        # transformer layers.
+        # Transformer layers.
         if args.retro_add_retriever:
             assert self.recompute_granularity != 'full', \
-                "full recompute not supported for retro."
+                "Full recompute not supported for Retro."
             assert args.transformer_impl == 'local', \
-                "transformer engine does not support retro layers."
+                "Transformer engine does not support Retro layers."
         def build_layer(layer_number):
             if args.transformer_impl == 'local':
                 current_layer_type = _get_layer_type(
                     model_type, layer_type, self.retro_layer_numbers,
                     layer_number)
-                return paralleltransformerlayer(
+                return ParallelTransformerLayer(
                     config,
                     layer_number,
                     layer_type=current_layer_type,
                     self_attn_mask_type=self_attn_mask_type,
                     drop_path_rate=self.drop_path_rates[layer_number - 1])
             else:
-                # this argument is only available from te v0.10 onwards.
+                # This argument is only available from TE v0.10 onwards.
                 extra_transformer_engine_kwargs = {}
                 if self.transformer_engine_v_0_8:
                     extra_transformer_engine_kwargs["bias"] = args.add_bias_linear
@@ -1407,7 +1407,7 @@ class paralleltransformer(megatronmodule):
                     extra_transformer_engine_kwargs["activation"] = "swiglu" if args.swiglu else "gelu"
                 if self.transformer_engine_v_0_11:
                     extra_transformer_engine_kwargs["normalization"] = args.normalization
-                return transformer_engine.pytorch.transformerlayer(
+                return transformer_engine.pytorch.TransformerLayer(
                     config.hidden_size,
                     config.ffn_hidden_size,
                     config.num_attention_heads,
@@ -1429,38 +1429,38 @@ class paralleltransformer(megatronmodule):
                     sequence_parallel=config.sequence_parallel,
                     params_dtype=config.params_dtype,
                     apply_residual_connection_post_layernorm=config.apply_residual_connection_post_layernorm,
-                    output_layernorm=false,
+                    output_layernorm=False,
                     layer_type="encoder",
                     drop_path_rate=self.drop_path_rates[layer_number - 1],
-                    set_parallel_mode=true,
-                    fuse_qkv_params=true,
+                    set_parallel_mode=True,
+                    fuse_qkv_params=True,
                     **extra_transformer_engine_kwargs)
 
-        if config.virtual_pipeline_model_parallel_size is not none:
+        if config.virtual_pipeline_model_parallel_size is not None:
             assert config.num_layers % config.virtual_pipeline_model_parallel_size == 0, \
                 'num_layers_per_stage must be divisible by ' \
                 'virtual_pipeline_model_parallel_size'
-            assert args.model_type != modeltype.encoder_and_decoder
-            # number of layers in each model chunk is the number of layers in the stage,
+            assert args.model_type != ModelType.encoder_and_decoder
+            # Number of layers in each model chunk is the number of layers in the stage,
             # divided by the number of model chunks in a stage.
             self.num_layers = self.num_layers // config.virtual_pipeline_model_parallel_size
-            # with 8 layers, 2 stages, and 4 model chunks, we want an assignment of
+            # With 8 layers, 2 stages, and 4 model chunks, we want an assignment of
             # layers to stages like (each list is a model chunk):
-            # stage 0: [0]  [2]  [4]  [6]
-            # stage 1: [1]  [3]  [5]  [7]
-            # with 8 layers, 2 stages, and 2 virtual stages, we want an assignment of
+            # Stage 0: [0]  [2]  [4]  [6]
+            # Stage 1: [1]  [3]  [5]  [7]
+            # With 8 layers, 2 stages, and 2 virtual stages, we want an assignment of
             # layers to stages like (each list is a model chunk):
-            # stage 0: [0, 1]  [4, 5]
-            # stage 1: [2, 3]  [6, 7]
+            # Stage 0: [0, 1]  [4, 5]
+            # Stage 1: [2, 3]  [6, 7]
             offset = mpu.get_virtual_pipeline_model_parallel_rank() * (
                 config.num_layers // config.virtual_pipeline_model_parallel_size) + \
                 (mpu.get_pipeline_model_parallel_rank() * self.num_layers)
         else:
-            # each stage gets a contiguous set of layers.
-            if args.model_type == modeltype.encoder_and_decoder and \
+            # Each stage gets a contiguous set of layers.
+            if args.model_type == ModelType.encoder_and_decoder and \
                     mpu.get_pipeline_model_parallel_world_size() > 1:
                 pipeline_rank = mpu.get_pipeline_model_parallel_rank()
-                if layer_type == layertype.encoder:
+                if layer_type == LayerType.encoder:
                     offset = pipeline_rank * self.num_layers
                 else:
                     num_ranks_in_enc = args.pipeline_model_parallel_split_rank
@@ -1469,34 +1469,34 @@ class paralleltransformer(megatronmodule):
                 offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
 
         if self.num_layers == 0:
-            # when a standalone embedding stage is used (e.g.,
-            # args.standalone_embedding_stage == true), virtual pipeline ranks
+            # When a standalone embedding stage is used (e.g.,
+            # args.standalone_embedding_stage == True), virtual pipeline ranks
             # on pipeline rank 0 will have zero transformer layers assigned to
-            # them. this results in the model's input and output tensors to be
+            # them. This results in the model's input and output tensors to be
             # the same, which will cause failure for certain output tensor
-            # optimizations (e.g., pipeline output deallocation). to remedy
+            # optimizations (e.g., pipeline output deallocation). To remedy
             # this, we assign a 'no-op' layer on these ranks, which will
             # disconnect the input tensor from the output tensor.
             self.num_layers = 1
-            self.layers = torch.nn.modulelist([ nooptransformerlayer(1) ])
+            self.layers = torch.nn.ModuleList([ NoopTransformerLayer(1) ])
         else:
-            self.layers = torch.nn.modulelist(
+            self.layers = torch.nn.ModuleList(
                 [build_layer(i + 1 + offset) for i in range(self.num_layers)])
 
-            # update dropout rate for retro encoder.
-            if model_type == modeltype.retro_encoder:
+            # Update dropout rate for Retro encoder.
+            if model_type == ModelType.retro_encoder:
                 for layer in self.layers:
                     if layer.self_attention.use_flash_attn:
                         layer.self_attention.core_attention_flash.dropout_p = \
-                            torch.nn.dropout(args.retro_encoder_attention_dropout)
+                            torch.nn.Dropout(args.retro_encoder_attention_dropout)
                     else:
                         layer.self_attention.core_attention.attention_dropout.p =\
                             args.retro_encoder_attention_dropout
                     layer.hidden_dropout = args.retro_encoder_hidden_dropout
 
         if self.post_process and self.post_layer_norm:
-            # final layer norm before output.
-            self.final_layernorm = layernorm(
+            # Final layer norm before output.
+            self.final_layernorm = LayerNorm(
                 config.hidden_size,
                 eps=config.layernorm_epsilon,
                 no_persist_layer_norm=args.no_persist_layer_norm,
@@ -1509,7 +1509,7 @@ class paralleltransformer(megatronmodule):
     def _checkpointed_forward(self, hidden_states, attention_mask,
                               encoder_output, enc_dec_attn_mask,
                               rotary_pos_emb, is_first_microbatch):
-        """forward method with activation checkpointing."""
+        """Forward method with activation checkpointing."""
         def custom(start, end):
             def custom_forward(*args, **kwargs):
                 x_, *args = args
@@ -1526,9 +1526,9 @@ class paralleltransformer(megatronmodule):
                 te_forward_kwargs['rotary_pos_emb'] = rotary_pos_emb
 
         if self.recompute_method == 'uniform':
-            # uniformly divide the total number of transformer layers and
+            # Uniformly divide the total number of Transformer layers and
             # checkpoint the input activation of each divided chunk.
-            # a method to further reduce memory usage reducing checkpoints.
+            # A method to further reduce memory usage reducing checkpoints.
             l = 0
             while l < self.num_layers:
                 if self.transformer_impl == 'transformer_engine':
@@ -1545,14 +1545,14 @@ class paralleltransformer(megatronmodule):
                         self.distribute_saved_activations,
                         hidden_states, attention_mask,
                         encoder_output, enc_dec_attn_mask,
-                        none, none, none, none, rotary_pos_emb)
+                        None, None, None, None, rotary_pos_emb)
 
                 l += self.recompute_num_layers
 
         elif self.recompute_method == 'block':
-            # checkpoint the input activation of only a set number of individual
-            # transformer layers and skip the rest.
-            # a method fully use the device memory removing redundant re-computation.
+            # Checkpoint the input activation of only a set number of individual
+            # Transformer layers and skip the rest.
+            # A method fully use the device memory removing redundant re-computation.
             for l in range(self.num_layers):
                 if l < self.recompute_num_layers:
                     if self.transformer_impl == 'transformer_engine':
@@ -1569,7 +1569,7 @@ class paralleltransformer(megatronmodule):
                             self.distribute_saved_activations,
                             hidden_states, attention_mask,
                             encoder_output, enc_dec_attn_mask,
-                            none, none, none, none, rotary_pos_emb)
+                            None, None, None, None, rotary_pos_emb)
                 else:
                     if self.transformer_impl == 'transformer_engine':
                         hidden_states = custom(l, l + 1)(
@@ -1579,83 +1579,83 @@ class paralleltransformer(megatronmodule):
                         hidden_states = custom(l, l + 1)(
                             hidden_states, attention_mask,
                             encoder_output, enc_dec_attn_mask,
-                            none, none, none, none, rotary_pos_emb)
+                            None, None, None, None, rotary_pos_emb)
         else:
-            raise valueerror("invalid activation recompute method.")
+            raise ValueError("Invalid activation recompute method.")
 
         return hidden_states
 
     def set_input_tensor(self, input_tensor):
-        """set input tensor to be used instead of forward()'s input.
+        """Set input tensor to be used instead of forward()'s input.
 
-        when doing pipeline parallelism the input from the previous
+        When doing pipeline parallelism the input from the previous
         stage comes from communication, not from the input, so the
-        model's forward_step_func won't have it. this function is thus
+        model's forward_step_func won't have it. This function is thus
         used by internal code to bypass the input provided by the
         forward_step_func"""
         self.input_tensor = input_tensor
 
     def forward(self, hidden_states, attention_mask,
-                encoder_output=none, enc_dec_attn_mask=none,
-                retriever_input=none,
-                retriever_output=none,
-                retriever_attn_mask=none,
-                inference_params=none,
-                rotary_pos_emb=none):
+                encoder_output=None, enc_dec_attn_mask=None,
+                retriever_input=None,
+                retriever_output=None,
+                retriever_attn_mask=None,
+                inference_params=None,
+                rotary_pos_emb=None):
         # hidden_states: [s, b, h]
 
-        # checks.
+        # Checks.
         if inference_params:
-            assert self.recompute_granularity is none, \
+            assert self.recompute_granularity is None, \
                 'inference does not work with activation checkpointing'
 
         if not self.pre_process:
-            # see set_input_tensor()
+            # See set_input_tensor()
             hidden_states = self.input_tensor
 
-        # viewless tensor.
-        # - we only need to create a viewless tensor in the case of micro batch
+        # Viewless tensor.
+        # - We only need to create a viewless tensor in the case of micro batch
         #   size (mbs) == 1, since in this case, 'hidden_states.transpose()'
         #   above creates a view tensor, and '.contiguous()' is a pass-through.
-        #   for mbs >= 2, '.contiguous()' creates a new tensor, eliminating
+        #   For mbs >= 2, '.contiguous()' creates a new tensor, eliminating
         #   the need to make it viewless.
         #
-        #   however, we don't explicitly check mbs == 1 here because
+        #   However, we don't explicitly check mbs == 1 here because
         #   make_viewless_tensor() has negligible overhead when its input
         #   is already viewless.
         #
-        # - for the 'else' case above, calling make_viewless_tensor() here is
+        # - For the 'else' case above, calling make_viewless_tensor() here is
         #   likely redundant, since p2p_communication.py (likely originator)
-        #   already creates viewless tensors. that said, make_viewless_tensor()
+        #   already creates viewless tensors. That said, make_viewless_tensor()
         #   is called here to be future-proof and corner-case-proof.
         hidden_states = core.utils.make_viewless_tensor(
             hidden_states,
-            requires_grad=true,
-            keep_graph=true,
+            requires_grad=True,
+            keep_graph=True,
         )
 
-        # rng context.
+        # RNG context.
         if self.sequence_parallel:
             rng_context = tensor_parallel.get_cuda_rng_tracker().fork()
         else:
             rng_context = nullcontext()
 
-        # forward layers.
+        # Forward layers.
         with rng_context:
-            # the fp8_autocast context manager is a no-op when enabled=true
-            # the if...else serves to short circuit name resolution for fp8_autocast
+            # The fp8_autocast context manager is a no-op when enabled=True
+            # The if...else serves to short circuit name resolution for fp8_autocast
             with transformer_engine.pytorch.fp8_autocast(
                 enabled=self.use_fp8,
                 fp8_recipe=self.fp8_recipe,
                 fp8_group=self.fp8_group
             ) if self.use_fp8 else nullcontext():
-                # determine if the current iteration is first microbatch
+                # Determine if the current iteration is first microbatch
                 if self.num_microbatches_in_previous_step != get_num_microbatches():
-                    self.microbatch_count = 0 # reset count on new batch size rampup interval
+                    self.microbatch_count = 0 # Reset count on new batch size rampup interval
                 self.num_microbatches_in_previous_step = get_num_microbatches()
                 is_first_microbatch = self.microbatch_count % get_num_microbatches() == 0
 
-                # forward pass.
+                # Forward pass.
                 if self.recompute_granularity == 'full':
                     hidden_states = self._checkpointed_forward(hidden_states,
                                                                attention_mask,
@@ -1689,19 +1689,19 @@ class paralleltransformer(megatronmodule):
                             attention_mask,
                             **forward_kwargs)
 
-                        # first retro decoder layer returns both hidden_states
-                        # and retriever_output. make retriever_output available
-                        # to subsequence retro layers.
+                        # First Retro decoder layer returns both hidden_states
+                        # and retriever_output. Make retriever_output available
+                        # to subsequence Retro layers.
                         if isinstance(hidden_states, tuple):
                             assert len(hidden_states) == 2
                             hidden_states, retriever_output = hidden_states
                             forward_kwargs["retriever_output"] = retriever_output
 
-                # skip counter update for eval and activation checkpointing
+                # Skip counter update for eval and activation checkpointing
                 if torch.is_grad_enabled() and self.training:
                     self.microbatch_count += 1
 
-        # final layer norm.
+        # Final layer norm.
         if self.post_process and self.post_layer_norm:
             hidden_states = self.final_layernorm(hidden_states)
 
